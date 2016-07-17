@@ -19,13 +19,16 @@
 #    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import sys
+import io
 
 BYTES_IN_LINE = 0x10 # Number of bytes to expect in each line
 
 c_addr = None
 hex_to_ch = {}
 
-for line in sys.stdin:
+ascii_stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='ascii', errors='strict')
+
+for line in ascii_stdin:
     line = line[:-1] # Strip the linefeed (we can't strip all white
                      # space here, think of a line of 0x20s)
     data, ascii_data = line.split("    ", maxsplit = 1)
