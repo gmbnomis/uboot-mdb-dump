@@ -3,7 +3,7 @@
 #    Small hackish script to convert an U-Boot memdump to a binary image
 #
 #    Copyright (C) 2015  Simon Baatz
-#    Updated: 2023 John Feehley
+#    Updated 2023: John Feehley
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@ from binwalk import scan
 class Utility():
     def __init__(self):
         self.args = self.get_args()
-        return 
+        return
 
 
     def get_args(self):
@@ -63,19 +63,19 @@ class MDB_Converter():
         self.bytes_in_line   = kwargs["bytes_in_line"]
         self.pattern         = compile("^[0-9a-fA-F]{8}\:")
         self.logfile_content = []
-        self.binary_data     = [] 
+        self.binary_data     = []
 
 
     def disable_output(self):
         stdout = open(devnull, "w")
         stderr = open(devnull, "w")
-        return 
+        return
 
 
     def enable_output(self):
         stdout = __stdout__
         stderr = __stderr__
-        return 
+        return
 
 
     def read_log(self):
@@ -89,18 +89,19 @@ class MDB_Converter():
             fptr.write(self.binary_data)
 
 
-    def extract_image(self): 
+    def extract_image(self):
         print("[+] Extracting...")
         self.disable_output()
         scan(
-            self.outfile, 
-            signature = True, 
-            quiet = True, 
+            self.outfile,
+            signature = True,
+            quiet = True,
             extract = True
         )
         print("\033[H\033[J", end="")
         self.enable_output()
-        return 
+        print(f"[+] Image extracted to {self.outfile}")
+        return
 
     def convert_log(self):
         c_addr     = None
@@ -115,19 +116,20 @@ class MDB_Converter():
                 break
 
         print("[+] Repairing image...")
+        abs_count = len(self.logfile_content)
         for line in tqdm(self.logfile_content):
+            abs_count -= 1
             line = line[:-1]
             try:
                 data, ascii_data = line.split("    ", maxsplit = 1)
             except ValueError:
-                #print("\033[H\033[J", end="")
-                print("[!] Rerun after stripping more of the logfile")
-                print("\tsometimes there are additional lines above and below")
-                exit(-1)
+                if "20 "*0x4 in line:
+                    data = ' '.join(line.split())
+                    ascii_data = " "*data.count("20 ")
 
             straddr, strdata = data.split(maxsplit = 1)
             addr = int.from_bytes(
-                bytes.fromhex(straddr[:-1]), 
+                bytes.fromhex(straddr[:-1]),
                 byteorder = "big"
             )
             if c_addr != addr - self.bytes_in_line:
@@ -135,15 +137,23 @@ class MDB_Converter():
                     exit(f"[!] Unexpected c_addr in line: '{line}'")
             c_addr = addr
             data = bytes.fromhex(strdata)
-            if len(data) != self.bytes_in_line:
-                exit(f"[!] Unexpected number of bytes in line: '{line}'")
+            if abs_count == 0 and len(data) != self.bytes_in_line:
+                print(f"[!] Unexpected number of bytes in line: '{line}'")
+                print("[+] Attempting to repair line...")
+                while len(data) < self.bytes_in_line:
+                    data += b"\x00"
+                ascii_data = data.decode()
 
             for b,c in zip(data, ascii_data):
-                try: 
-                    if hex_to_chr[b] != c: 
-                        exit("[!] Inconsistency between hex data and " +\
-                             "ASCII data in line (or the lines before): " +\
-                            f"'{line}'")
+                try:
+                    if hex_to_chr[b] != c:
+                        print("[!] Inconsistency between hex data and "   +\
+                             "ASCII data in line: " +\
+                            f"'0x{straddr[:-1]}'. Attempting repair...")
+                        if hex_to_chr[b] == "." and c == " ":
+                            c = ","
+                    if c not in hex_to_chr:
+                        hex_to_chr[b] = c
                 except KeyError:
                     hex_to_chr[b] = c
 
@@ -155,7 +165,7 @@ class MDB_Converter():
 def main():
     #args = Utility.get_args()
     utilities = Utility()
-    
+
     mdb_converter = MDB_Converter(
         logfile = utilities.args["logfile"],
         outfile = utilities.args["outfile"],
