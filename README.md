@@ -66,3 +66,7 @@ $ python3 uboot_mdb_to_image.py outfile.log
 [+] Extracting...
 <...Clipping output...>
 ```
+
+## TODO
+- [ ] Create better logfile cleaning 
+- [ ] Allow for XXD input 
